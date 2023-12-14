@@ -5,10 +5,15 @@ import time
 import argparse
 import numpy as np
 import cv2
+#from gpiozero import LED
+import threading
 
 from detector import Detector
 
-
+'''left = LED(17)
+intersect = LED(20)
+right = LED(22)'''
+position = [0,0,0]
 def get_args():
     parser = argparse.ArgumentParser()
 
@@ -66,7 +71,7 @@ def main():
     num_threads = args.num_threads
 
     # カメラ準備 ###############################################################
-    cap = cv2.VideoCapture(cap_device)
+    cap = cv2.VideoCapture(1)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, cap_width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cap_height)
 
@@ -111,10 +116,10 @@ def main():
 
         # 画面反映 #########################################################
         debug_image = cv2.resize(debug_image, (cap_width, cap_height))
-        cv2.imshow('Person Detection Demo', debug_image)
+        #cv2.imshow('Person Detection Demo', debug_image)
 
     cap.release()
-    cv2.destroyAllWindows()
+    #cv2.destroyAllWindows()
 
 def draw_debug(
     image,
@@ -124,35 +129,41 @@ def draw_debug(
     scores,
     class_ids
 ):
+
     debug_image = copy.deepcopy(image)
     x1_line, y1_line = 320, 0
     x2_line, y2_line = 320, 360
-    line_thickness = 2
-    debug_image = cv2.line(debug_image, (x1_line, y1_line), (x2_line, y2_line), (0, 255, 0), thickness=line_thickness)
+    #line_thickness = 2
+    #debug_image = cv2.line(debug_image, (x1_line, y1_line), (x2_line, y2_line), (0, 255, 0), thickness=line_thickness)
     for bbox, score, class_id in zip(bboxes, scores, class_ids):
         x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
         if(x1 < x1_line and x2 < x1_line):
-            print("right")
+            #print("right")
+            position[2] = 1
+
         elif(x1 > x1_line and x2 > x1_line):
-            print("left")
+            #print("left")
+            position[0] = 1
+
         else:
-            print("intersect")
+            #print("intersect")
+            position[1] = 1
         if score_th > score:
             continue
 
         # バウンディングボックス
-        debug_image = cv2.rectangle(
+        '''debug_image = cv2.rectangle(
             debug_image,
             (x1, y1),
             (x2, y2),
             (0, 255, 0),
             thickness=2,
-        )
+        )'''
 
         # クラスID、スコア
         score = '%.2f' % score
         text = '%s:%s' % (str(int(class_id)), score)
-        debug_image = cv2.putText(
+        '''debug_image = cv2.putText(
             debug_image,
             text,
             (x1, y1 - 10),
@@ -160,12 +171,12 @@ def draw_debug(
             0.7,
             (0, 255, 0),
             thickness=2,
-        )
+        )'''
 
     # 推論時間
     text = 'Elapsed time:' + '%.0f' % (elapsed_time * 1000)
     text = text + 'ms'
-    debug_image = cv2.putText(
+    '''debug_image = cv2.putText(
         debug_image,
         text,
         (10, 30),
@@ -174,9 +185,24 @@ def draw_debug(
         (0, 255, 0),
         thickness=2,
     )
-    print(len(bboxes))
+    print(len(bboxes))'''
     return debug_image
 
-
-if __name__ == '__main__':
-    main()
+def sendData():
+    while True:
+        if(position[0] == 1):
+            print("left")
+        if(position[1] == 1):
+            print("intersect")
+        if(position[2] == 1):
+            print("right")
+        position[0] = 0
+        position[1] = 0
+        position[2] = 0
+        time.sleep(2)
+main_thread = threading.Thread(target=main)
+send_thread = threading.Thread(target=sendData)
+main_thread.start()
+send_thread.start()
+main_thread.join()
+send_thread.join()
