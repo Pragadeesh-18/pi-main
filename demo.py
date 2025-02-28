@@ -7,13 +7,18 @@ import numpy as np
 import cv2
 #from gpiozero import LED
 import threading
-
+import firebase_admin
+from firebase_admin import credentials, db
+import random
+import string
+import time
+import datetime
 from detector import Detector
 
 '''left = LED(17)
 intersect = LED(20)
 right = LED(22)'''
-position = [0,0,0]
+return_dict = {}
 def get_args():
     parser = argparse.ArgumentParser()
 
@@ -137,17 +142,19 @@ def draw_debug(
     #debug_image = cv2.line(debug_image, (x1_line, y1_line), (x2_line, y2_line), (0, 255, 0), thickness=line_thickness)
     for bbox, score, class_id in zip(bboxes, scores, class_ids):
         x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+        
+        return_dict['coordinates'] = (x1, y1, x2, y2)
         if(x1 < x1_line and x2 < x1_line):
             #print("right")
-            position[2] = 1
+            return_dict['position'] = 'right'
 
         elif(x1 > x1_line and x2 > x1_line):
             #print("left")
-            position[0] = 1
+            return_dict['position'] = 'left'
 
         else:
             #print("intersect")
-            position[1] = 1
+            return_dict['position'] = 'intersect'
         if score_th > score:
             continue
 
@@ -188,17 +195,20 @@ def draw_debug(
     print(len(bboxes))'''
     return debug_image
 
+def initialize_firebase():
+    # Path to your Firebase service account key file
+    cred = credentials.Certificate(r"C:\Users\Pragadeesh\Desktop\credentials.json")
+    
+    # Initialize the app with a service account, granting admin privileges
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://college-sothanai-default-rtdb.asia-southeast1.firebasedatabase.app/'  # Replace with your database URL
+    })
+
 def sendData():
+    initialize_firebase()
+    ref = db.reference('final_data')
     while True:
-        if(position[0] == 1):
-            print("left")
-        if(position[1] == 1):
-            print("intersect")
-        if(position[2] == 1):
-            print("right")
-        position[0] = 0
-        position[1] = 0
-        position[2] = 0
+        ref.push().set(return_dict)
         time.sleep(2)
 main_thread = threading.Thread(target=main)
 send_thread = threading.Thread(target=sendData)
